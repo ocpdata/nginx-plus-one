@@ -4,23 +4,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  terraform:
     runs-on: ubuntu-latest
     env:
-      terraform:
+      TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
       TFC_TOKEN: ${{ secrets.TFC_TOKEN }}
       TFC_ORG: ${{ secrets.TFC_ORG }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      NGINX_REPO_CRT: ${{ secrets.NGINX_REPO_CRT }}
-      NGINX_REPO_KEY: ${{ secrets.NGINX_REPO_KEY }}
-      LICENSE_JWT: ${{ secrets.LICENSE_JWT }}
-        outputs:
-          public_ip: ${{ steps.ip.outputs.public_ip }}
-      LICENSE_KEY: ${{ secrets.LICENSE_KEY }}
-      DATA_PLANE_KEY: ${{ secrets.DATA_PLANE_KEY }}
+    outputs:
+      public_ip: ${{ steps.ip.outputs.public_ip }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
