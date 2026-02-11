@@ -117,7 +117,7 @@ jobs:
           mkdir -p ~/.ssh
           cp /tmp/gha_ssh_key.private ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ needs.terraform.outputs.public_ip }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -T 10 -H "${{ needs.terraform.outputs.public_ip }}" >> ~/.ssh/known_hosts || true
 
       - name: Upload NGINX secrets
         run: |
