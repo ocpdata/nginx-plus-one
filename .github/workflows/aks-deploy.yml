@@ -143,9 +143,9 @@ jobs:
           # private-registry.nginx.com uses mTLS client-cert auth.
           # Place cert/key where the Docker daemon expects them.
           sudo mkdir -p /etc/docker/certs.d/private-registry.nginx.com
-          printf '%b' "${{ secrets.NGINX_REPO_CRT }}" \
+          printf '%s' "${{ secrets.NGINX_REPO_CRT }}" \
             | sudo tee /etc/docker/certs.d/private-registry.nginx.com/client.cert > /dev/null
-          printf '%b' "${{ secrets.NGINX_REPO_KEY }}" \
+          printf '%s' "${{ secrets.NGINX_REPO_KEY }}" \
             | sudo tee /etc/docker/certs.d/private-registry.nginx.com/client.key > /dev/null
           sudo chmod 0400 \
             /etc/docker/certs.d/private-registry.nginx.com/client.cert \
