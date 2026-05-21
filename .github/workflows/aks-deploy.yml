@@ -229,6 +229,25 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - name: Resolve latest non-LTS AKS version
+        id: k8s-version
+        run: |
+          az login --service-principal \
+            --username "${{ secrets.AZURE_CLIENT_ID }}" \
+            --password "${{ secrets.AZURE_CLIENT_SECRET }}" \
+            --tenant  "${{ secrets.AZURE_TENANT_ID }}"
+          az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+
+          K8S_VERSION=$(az aks get-versions --location eastus -o json | \
+            jq -r '[.values[] | select((.capabilities.supportPlan | contains(["AKSLongTermSupport"])) | not) | .version] | sort | last')
+
+          if [[ -z "${K8S_VERSION}" || "${K8S_VERSION}" == "null" ]]; then
+            echo "ERROR: no non-LTS AKS version found in eastus"
+            exit 1
+          fi
+          echo "Resolved non-LTS AKS version: ${K8S_VERSION}"
+          echo "k8s_version=${K8S_VERSION}" >> $GITHUB_OUTPUT
+
       - name: Terraform Init
         working-directory: aks-nginx-plus/terraform/aks
         env:
@@ -318,6 +337,7 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           terraform plan \
+            -var "kubernetes_version=${{ steps.k8s-version.outputs.k8s_version }}" \
             -out=tfplan
 
       - name: Upload tfplan artifact
