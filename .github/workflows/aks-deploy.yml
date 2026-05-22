@@ -186,13 +186,14 @@ jobs:
             -noout -subject -issuer -dates -serial
 
           echo "==> Verifying mTLS against private-registry.nginx.com/v2/"
-          HTTP_CODE=$(curl -sS -o /tmp/private-registry-v2.out -w '%{http_code}' \
+          sudo rm -f /tmp/private-registry-v2.out
+          HTTP_CODE=$(sudo curl -sS -o /tmp/private-registry-v2.out -w '%{http_code}' \
             --cert /etc/docker/certs.d/private-registry.nginx.com/client.cert \
             --key /etc/docker/certs.d/private-registry.nginx.com/client.key \
             https://private-registry.nginx.com/v2/ || true)
           if [[ "${HTTP_CODE}" != "200" && "${HTTP_CODE}" != "401" ]]; then
             echo "ERROR: mTLS preflight to private-registry.nginx.com failed with HTTP ${HTTP_CODE}"
-            sed -n '1,40p' /tmp/private-registry-v2.out || true
+            sudo sed -n '1,40p' /tmp/private-registry-v2.out || true
             exit 1
           fi
 
