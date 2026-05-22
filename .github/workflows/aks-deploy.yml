@@ -587,8 +587,7 @@ jobs:
             --set controller.appprotect.configManager.image.tag="$(cut -d: -f2 <<< "${WAF_CONFIG_MGR_IMAGE}")" \
             --wait \
             --timeout 15m \
-            --cleanup-on-fail \
-            --force
+            --cleanup-on-fail
 
       - name: Diagnose NIC pod (runs on failure)
         if: failure()
