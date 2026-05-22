@@ -28,7 +28,6 @@ resource "azurerm_kubernetes_cluster" "main" {
     auto_scaling_enabled = true
     min_count            = var.node_min
     max_count            = var.node_max
-    node_count           = var.node_desired
 
     # Use the Azure CNI for compatibility with standard LB and kubenet policies
     temporary_name_for_rotation = "tmpdefault"
