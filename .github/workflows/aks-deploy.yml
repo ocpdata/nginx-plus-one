@@ -629,7 +629,6 @@ jobs:
       - name: Verify NIC deployment
         run: |
           # Scale old ReplicaSets to 0 so their pods don't get recreated after force-delete.
-          # The current RS is identified by matching the Deployment's revision annotation.
           CURRENT_REVISION=$(kubectl get deployment nginx-ingress-controller \
             -n nginx-ingress \
             -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}')
@@ -640,10 +639,14 @@ jobs:
               '.items[] | select(.metadata.annotations["deployment.kubernetes.io/revision"] != $rev) | .metadata.name' \
             | xargs -r -I{} kubectl scale rs {} --replicas=0 -n nginx-ingress || true
 
-          # Now force-delete any remaining stuck pods
+          # Force-delete any stuck Terminating pods
           kubectl get pods -n nginx-ingress -o json \
             | jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .metadata.name' \
             | xargs -r kubectl delete pod -n nginx-ingress --force --grace-period=0 || true
+
+          # Restart the deployment AFTER WAF policies are in place so the
+          # progressDeadlineSeconds clock starts fresh with config_set.json available.
+          kubectl rollout restart deployment/nginx-ingress-controller -n nginx-ingress
 
           kubectl rollout status deployment/nginx-ingress-controller \
             -n nginx-ingress --timeout=10m
