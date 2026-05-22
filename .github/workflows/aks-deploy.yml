@@ -566,18 +566,19 @@ jobs:
           fi
           # Use the official OCI chart — it includes nginxAgent.* support
           # Ref: https://docs.nginx.com/nginx-one-console/k8s/add-nic/
+          # Install without --wait to avoid deadlock:
+          # waf-config-mgr needs APPolicy CRDs to generate config_set.json,
+          # but those CRDs only exist after Helm installs them.
           helm upgrade --install nginx-ingress \
             oci://ghcr.io/nginx/charts/nginx-ingress --version 2.4.4 \
             --namespace nginx-ingress \
             --values aks-nginx-plus/k8s/nginx-ic/nic-values.yaml \
-            --set controller.image.repository="$(cut -d: -f1 <<< "${NIC_IMAGE}")" \
-            --set controller.image.tag="$(cut -d: -f2 <<< "${NIC_IMAGE}")" \
-            --set controller.appprotect.enforcer.image.repository="$(cut -d: -f1 <<< "${WAF_ENFORCER_IMAGE}")" \
-            --set controller.appprotect.enforcer.image.tag="$(cut -d: -f2 <<< "${WAF_ENFORCER_IMAGE}")" \
-            --set controller.appprotect.configManager.image.repository="$(cut -d: -f1 <<< "${WAF_CONFIG_MGR_IMAGE}")" \
-            --set controller.appprotect.configManager.image.tag="$(cut -d: -f2 <<< "${WAF_CONFIG_MGR_IMAGE}")" \
-            --wait \
-            --timeout 15m \
+            --set controller.image.repository="$(cut -d: -f1 <<< "${NIC_IMAGE}")"\
+            --set controller.image.tag="$(cut -d: -f2 <<< "${NIC_IMAGE}")"\
+            --set controller.appprotect.enforcer.image.repository="$(cut -d: -f1 <<< "${WAF_ENFORCER_IMAGE}")"\
+            --set controller.appprotect.enforcer.image.tag="$(cut -d: -f2 <<< "${WAF_ENFORCER_IMAGE}")"\
+            --set controller.appprotect.configManager.image.repository="$(cut -d: -f1 <<< "${WAF_CONFIG_MGR_IMAGE}")"\
+            --set controller.appprotect.configManager.image.tag="$(cut -d: -f2 <<< "${WAF_CONFIG_MGR_IMAGE}")"\
             --cleanup-on-fail
 
       - name: Diagnose NIC pod (runs on failure)
@@ -608,18 +609,26 @@ jobs:
           echo "=== Events in nginx-ingress namespace ==="
           kubectl get events -n nginx-ingress --sort-by='.lastTimestamp' | tail -30
 
-      - name: Remove obsolete NAP v4 CRDs (APPolicy/APLogConf not used with NAP v5)
+      - name: Apply NAP WAF v5 policies (required for waf-config-mgr to generate config_set.json)
         run: |
-          # NAP WAF v5 uses pre-compiled bundles baked into the NIC image.
-          # APPolicy + APLogConf CRDs only apply to NAP v4.
-          # The policy is activated via a k8s.nginx.org/v1 Policy CRD
-          # referencing the bundle, applied per-namespace in the deploy-app job.
-          echo "NAP v5 bundle is embedded in the NIC image — no APPolicy CRDs to apply."
+          # waf-config-mgr watches APPolicy/APLogConf CRDs to generate config_set.json.
+          # Without at least one policy, NGINX cannot start.
+          # Wait for App Protect CRDs to be established by Helm before applying.
+          kubectl wait --for=condition=established \
+            crd/appolicies.appprotect.f5.com \
+            crd/aplogconfs.appprotect.f5.com \
+            --timeout=120s
+          # cine namespace must exist before applying the WAF policy (created here,
+          # idempotent — deploy-app job will also apply it)
+          kubectl create namespace cine --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f aks-nginx-plus/k8s/waf/waf-logconf.yaml
+          kubectl apply -f aks-nginx-plus/k8s/waf/waf-policy.yaml
+          echo "WAF policies applied."
 
       - name: Verify NIC deployment
         run: |
           kubectl rollout status deployment/nginx-ingress-controller \
-            -n nginx-ingress --timeout=3m
+            -n nginx-ingress --timeout=10m
           kubectl get svc nginx-ingress-controller -n nginx-ingress
 
   # ─────────────────────────────────────────────
