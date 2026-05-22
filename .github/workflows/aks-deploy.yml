@@ -628,12 +628,10 @@ jobs:
 
       - name: Verify NIC deployment
         run: |
-          # Delete any pods stuck in Error/ImagePullBackOff from previous runs
-          # so they don't block the rolling update termination.
-          kubectl get pods -n nginx-ingress \
-            --field-selector=status.phase!=Running \
-            -o jsonpath='{.items[*].metadata.name}' \
-            | tr ' ' '\n' | grep -v '^$' \
+          # Force-delete pods stuck in Terminating (deletionTimestamp set but not gone)
+          # so they don't block the rolling update.
+          kubectl get pods -n nginx-ingress -o json \
+            | jq -r '.items[] | select(.metadata.deletionTimestamp != null) | .metadata.name' \
             | xargs -r kubectl delete pod -n nginx-ingress --force --grace-period=0 || true
 
           kubectl rollout status deployment/nginx-ingress-controller \
