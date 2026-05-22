@@ -621,6 +621,7 @@ jobs:
           # cine namespace must exist before applying the WAF policy (created here,
           # idempotent — deploy-app job will also apply it)
           kubectl create namespace cine --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create namespace cine-tmdb --dry-run=client -o yaml | kubectl apply -f -
           kubectl apply -f aks-nginx-plus/k8s/waf/waf-logconf.yaml
           kubectl apply -f aks-nginx-plus/k8s/waf/waf-policy.yaml
           echo "WAF policies applied."
