@@ -20,7 +20,7 @@ controller:
   # ── Image (repo + tag overridden in workflow via --set) ─────────────────────
   image:
     repository: ghcr.io/ocpdata/nginx-nic # overridden with --set
-    tag: "latest"                          # overridden with --set
+    tag: "latest" # overridden with --set
     pullPolicy: Always
 
   # ── Pull secret for GHCR ────────────────────────────────────────────────────
@@ -30,6 +30,7 @@ controller:
   # ── NGINX App Protect WAF ───────────────────────────────────────────────────
   appprotect:
     enable: true
+    v5: true
 
   # Keep the same IngressClass name so existing Ingress resources work unchanged
   ingressClass:

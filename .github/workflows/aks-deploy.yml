@@ -133,6 +133,8 @@ jobs:
     needs: setup
     outputs:
       image: ${{ steps.meta.outputs.image }}
+      waf_enforcer_image: ${{ steps.meta.outputs.waf_enforcer_image }}
+      waf_config_mgr_image: ${{ steps.meta.outputs.waf_config_mgr_image }}
 
     steps:
       - name: Checkout
@@ -198,15 +200,36 @@ jobs:
           DOCKERFILE="aks-nginx-plus/docker/nginx-nic/Dockerfile"
           NIC_VERSION=$(grep '^ARG NIC_VERSION' "${DOCKERFILE}" \
             | head -1 | cut -d= -f2 | tr -d '[:space:]')
+          COMPILER_VERSION=$(grep '^ARG COMPILER_VERSION' "${DOCKERFILE}" \
+            | head -1 | cut -d= -f2 | tr -d '[:space:]')
           IMAGE="ghcr.io/${{ github.repository_owner }}/nginx-nic:${{ github.sha }}"
+          WAF_ENFORCER_IMAGE="ghcr.io/${{ github.repository_owner }}/waf-enforcer:${COMPILER_VERSION}"
+          WAF_CONFIG_MGR_IMAGE="ghcr.io/${{ github.repository_owner }}/waf-config-mgr:${COMPILER_VERSION}"
           echo "==> IMAGE: ${IMAGE}"
           docker build \
             --build-arg NIC_VERSION="${NIC_VERSION}" \
             --tag "${IMAGE}" \
             aks-nginx-plus/docker/nginx-nic/
           docker push "${IMAGE}"
+
+          docker pull "private-registry.nginx.com/nap/waf-enforcer:${COMPILER_VERSION}"
+          docker tag \
+            "private-registry.nginx.com/nap/waf-enforcer:${COMPILER_VERSION}" \
+            "${WAF_ENFORCER_IMAGE}"
+          docker push "${WAF_ENFORCER_IMAGE}"
+
+          docker pull "private-registry.nginx.com/nap/waf-config-mgr:${COMPILER_VERSION}"
+          docker tag \
+            "private-registry.nginx.com/nap/waf-config-mgr:${COMPILER_VERSION}" \
+            "${WAF_CONFIG_MGR_IMAGE}"
+          docker push "${WAF_CONFIG_MGR_IMAGE}"
+
           echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+          echo "waf_enforcer_image=${WAF_ENFORCER_IMAGE}" >> $GITHUB_OUTPUT
+          echo "waf_config_mgr_image=${WAF_CONFIG_MGR_IMAGE}" >> $GITHUB_OUTPUT
           echo "NIC image pushed: ${IMAGE}"
+          echo "WAF enforcer image pushed: ${WAF_ENFORCER_IMAGE}"
+          echo "WAF config manager image pushed: ${WAF_CONFIG_MGR_IMAGE}"
 
       - name: Clean up Docker mTLS certs
         if: always()
@@ -251,9 +274,9 @@ jobs:
       - name: Terraform Init
         working-directory: aks-nginx-plus/terraform/aks
         env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: terraform init
 
@@ -291,18 +314,18 @@ jobs:
       - name: Terraform Validate
         working-directory: aks-nginx-plus/terraform/aks
         env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: terraform validate
 
       - name: Import orphaned Azure resources (if any)
         working-directory: aks-nginx-plus/terraform/aks
         env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           SUB_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
@@ -331,9 +354,9 @@ jobs:
       - name: Terraform Plan
         working-directory: aks-nginx-plus/terraform/aks
         env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           terraform plan \
@@ -355,9 +378,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: terraform-plan
     outputs:
-      cluster_name:        ${{ steps.tf-output.outputs.cluster_name }}
+      cluster_name: ${{ steps.tf-output.outputs.cluster_name }}
       resource_group_name: ${{ steps.tf-output.outputs.resource_group_name }}
-      location:            ${{ steps.tf-output.outputs.location }}
+      location: ${{ steps.tf-output.outputs.location }}
 
     steps:
       - name: Checkout
@@ -371,9 +394,9 @@ jobs:
       - name: Terraform Init
         working-directory: aks-nginx-plus/terraform/aks
         env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: terraform init
 
@@ -386,9 +409,9 @@ jobs:
       - name: Terraform Apply
         working-directory: aks-nginx-plus/terraform/aks
         env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: terraform apply -auto-approve tfplan
 
@@ -396,9 +419,9 @@ jobs:
         id: tf-output
         working-directory: aks-nginx-plus/terraform/aks
         env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
           echo "cluster_name=$(terraform output -raw cluster_name)"               >> $GITHUB_OUTPUT
@@ -496,8 +519,14 @@ jobs:
       - name: Install NGINX Plus NIC with App Protect WAF
         run: |
           NIC_IMAGE="${{ needs.build-nic.outputs.image }}"
+          WAF_ENFORCER_IMAGE="${{ needs.build-nic.outputs.waf_enforcer_image }}"
+          WAF_CONFIG_MGR_IMAGE="${{ needs.build-nic.outputs.waf_config_mgr_image }}"
           if [[ -z "${NIC_IMAGE}" ]]; then
             echo "ERROR: build-nic output image is empty"
+            exit 1
+          fi
+          if [[ -z "${WAF_ENFORCER_IMAGE}" || -z "${WAF_CONFIG_MGR_IMAGE}" ]]; then
+            echo "ERROR: WAF sidecar image outputs are empty"
             exit 1
           fi
           # Use the official OCI chart — it includes nginxAgent.* support
@@ -508,6 +537,10 @@ jobs:
             --values aks-nginx-plus/k8s/nginx-ic/nic-values.yaml \
             --set controller.image.repository="$(cut -d: -f1 <<< "${NIC_IMAGE}")" \
             --set controller.image.tag="$(cut -d: -f2 <<< "${NIC_IMAGE}")" \
+            --set controller.appprotect.enforcer.image.repository="$(cut -d: -f1 <<< "${WAF_ENFORCER_IMAGE}")" \
+            --set controller.appprotect.enforcer.image.tag="$(cut -d: -f2 <<< "${WAF_ENFORCER_IMAGE}")" \
+            --set controller.appprotect.configManager.image.repository="$(cut -d: -f1 <<< "${WAF_CONFIG_MGR_IMAGE}")" \
+            --set controller.appprotect.configManager.image.tag="$(cut -d: -f2 <<< "${WAF_CONFIG_MGR_IMAGE}")" \
             --wait \
             --timeout 10m
 
@@ -517,15 +550,23 @@ jobs:
           echo "=== Pods in nginx-ingress ==="
           kubectl get pods -n nginx-ingress -o wide
           echo ""
-          echo "=== Describe NIC pod ==="
-          POD=$(kubectl get pod -n nginx-ingress -l app=nginx-ingress -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-          if [[ -n "${POD}" ]]; then
-            kubectl describe pod "${POD}" -n nginx-ingress
-            echo ""
-            echo "=== NIC pod logs (last 100 lines) ==="
-            kubectl logs "${POD}" -n nginx-ingress --tail=100 || true
-          else
+          echo "=== Deployment status ==="
+          kubectl describe deployment nginx-ingress-controller -n nginx-ingress || true
+          echo ""
+          echo "=== Describe NIC pods ==="
+          PODS=$(kubectl get pods -n nginx-ingress -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+          if [[ -z "${PODS}" ]]; then
             echo "No NIC pod found"
+          else
+            while IFS= read -r POD; do
+              [[ -z "${POD}" ]] && continue
+              echo "--- ${POD} ---"
+              kubectl describe pod "${POD}" -n nginx-ingress || true
+              echo ""
+              echo "=== ${POD} logs (all containers, last 100 lines) ==="
+              kubectl logs "${POD}" -n nginx-ingress --all-containers=true --tail=100 || true
+              echo ""
+            done <<< "${PODS}"
           fi
           echo ""
           echo "=== Events in nginx-ingress namespace ==="
