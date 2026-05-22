@@ -517,15 +517,6 @@ jobs:
           kubectl create namespace nginx-ingress --dry-run=client -o yaml \
             | kubectl apply -f -
 
-      - name: Create GHCR imagePullSecret for NIC
-        run: |
-          kubectl create secret docker-registry ghcr-secret \
-            --docker-server=ghcr.io \
-            --docker-username=${{ github.repository_owner }} \
-            --docker-password=${{ secrets.GHCR_PAT }} \
-            --namespace nginx-ingress \
-            --dry-run=client -o yaml | kubectl apply -f -
-
       - name: Create NGINX Plus license secret
         run: |
           # Write values to temp files to safely handle newlines / special chars

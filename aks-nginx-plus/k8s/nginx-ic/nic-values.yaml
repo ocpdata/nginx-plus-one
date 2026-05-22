@@ -23,10 +23,6 @@ controller:
     tag: "latest" # overridden with --set
     pullPolicy: Always
 
-  # ── Pull secret for GHCR ────────────────────────────────────────────────────
-  serviceAccount:
-    imagePullSecretName: ghcr-secret
-
   # ── NGINX App Protect WAF ───────────────────────────────────────────────────
   appprotect:
     enable: true
