@@ -175,6 +175,22 @@ jobs:
             exit 1
           fi
 
+          echo "==> Client cert metadata"
+          sudo openssl x509 \
+            -in /etc/docker/certs.d/private-registry.nginx.com/client.cert \
+            -noout -subject -issuer -dates -serial
+
+          echo "==> Verifying mTLS against private-registry.nginx.com/v2/"
+          HTTP_CODE=$(curl -sS -o /tmp/private-registry-v2.out -w '%{http_code}' \
+            --cert /etc/docker/certs.d/private-registry.nginx.com/client.cert \
+            --key /etc/docker/certs.d/private-registry.nginx.com/client.key \
+            https://private-registry.nginx.com/v2/ || true)
+          if [[ "${HTTP_CODE}" != "200" && "${HTTP_CODE}" != "401" ]]; then
+            echo "ERROR: mTLS preflight to private-registry.nginx.com failed with HTTP ${HTTP_CODE}"
+            sed -n '1,40p' /tmp/private-registry-v2.out || true
+            exit 1
+          fi
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
