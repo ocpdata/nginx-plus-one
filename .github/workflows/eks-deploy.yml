@@ -139,14 +139,41 @@ jobs:
         run: |
           # private-registry.nginx.com uses mTLS client-cert auth.
           # Place cert/key where the Docker daemon expects them.
+          if [[ -z "${{ secrets.NGINX_REPO_CRT }}" || -z "${{ secrets.NGINX_REPO_KEY }}" ]]; then
+            echo "ERROR: NGINX_REPO_CRT or NGINX_REPO_KEY secret is empty"
+            exit 1
+          fi
           sudo mkdir -p /etc/docker/certs.d/private-registry.nginx.com
           printf '%s' "${{ secrets.NGINX_REPO_CRT }}" \
+            | perl -pe 's/\\n/\n/g' \
             | sudo tee /etc/docker/certs.d/private-registry.nginx.com/client.cert > /dev/null
           printf '%s' "${{ secrets.NGINX_REPO_KEY }}" \
+            | perl -pe 's/\\n/\n/g' \
             | sudo tee /etc/docker/certs.d/private-registry.nginx.com/client.key > /dev/null
-          sudo chmod 0400 \
+          sudo chmod 0600 \
             /etc/docker/certs.d/private-registry.nginx.com/client.cert \
             /etc/docker/certs.d/private-registry.nginx.com/client.key
+
+          sudo openssl x509 \
+            -in /etc/docker/certs.d/private-registry.nginx.com/client.cert \
+            -noout -subject >/dev/null
+          sudo openssl pkey \
+            -in /etc/docker/certs.d/private-registry.nginx.com/client.key \
+            -noout >/dev/null
+
+          CERT_PUBKEY_SHA=$(sudo openssl x509 \
+            -in /etc/docker/certs.d/private-registry.nginx.com/client.cert \
+            -pubkey -noout \
+            | openssl pkey -pubin -outform pem \
+            | sha256sum | awk '{print $1}')
+          KEY_PUBKEY_SHA=$(sudo openssl pkey \
+            -in /etc/docker/certs.d/private-registry.nginx.com/client.key \
+            -pubout -outform pem \
+            | sha256sum | awk '{print $1}')
+          if [[ "${CERT_PUBKEY_SHA}" != "${KEY_PUBKEY_SHA}" ]]; then
+            echo "ERROR: NGINX_REPO_CRT and NGINX_REPO_KEY do not match"
+            exit 1
+          fi
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
